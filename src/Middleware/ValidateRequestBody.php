@@ -59,8 +59,6 @@ class ValidateRequestBody implements MiddlewareInterface
         $matchedRoute = getCurrentRouteFromMatchedRoute($routeResult, $this->routeCollector);
         $matchedRouteOptions = $matchedRoute->getOptions();
 
-        $matchedRouteOptions = [];
-
         if (empty($matchedRouteOptions['validation_rules'])) {
             return [];
         }
