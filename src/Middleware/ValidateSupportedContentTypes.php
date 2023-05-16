@@ -58,7 +58,7 @@ class ValidateSupportedContentTypes implements MiddlewareInterface
         throw new ContentTypeNotSupportedException($contentType);
     }
 
-    private function matchContentTypeFromRoute(?string $contentType, ServerRequestInterface $request)
+    private function matchContentTypeFromRoute(?string $contentType, ServerRequestInterface $request): void
     {
         $routeResult = $request->getAttribute(RouteResult::class);
 
@@ -68,8 +68,8 @@ class ValidateSupportedContentTypes implements MiddlewareInterface
 
         $routeConfig = getCurrentRouteFromMatchedRoute($routeResult, $this->routeCollector);
 
-        if (isset($routeConfig['content_types']) && is_array($routeConfig['content_types'])) {
-            if (!in_array($contentType, $routeConfig['content_types'])) {
+        if (isset($routeConfig->getOptions()['content_types']) && is_array($routeConfig->getOptions()['content_types'])) {
+            if (!in_array($contentType, $routeConfig->getOptions()['content_types'])) {
                 throw new ContentTypeNotSupportedException($contentType);
             }
         }
