@@ -17,15 +17,19 @@ class LogExceptions implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        $error = $handler->handle($request);
-        $body = json_decode($error->getBody()->getContents(), false);
+        $error_handle = $handler->handle($request);
+        $body = json_decode($$error_handle->getBody()->getContents(), false);
+
+        $error = ($body === null && json_last_error() !== JSON_ERROR_NONE)
+                 ? 'Error: Invalid response'
+                 : (empty($body->errors) || !isset($body->errors)) ? $body : $body->errors;
 
         if ($error instanceof NonCriticalDomainException) {
-            Log::error($body->errors, [], self::EXCEPTIONS_CHANNEL);
+            Log::error($error, [], self::EXCEPTIONS_CHANNEL);
         } else {
-            Log::critical($body->errors, [], self::EXCEPTIONS_CHANNEL);
+            Log::critical($error, [], self::EXCEPTIONS_CHANNEL);
         }
 
-        return $error;
+        return $error_handle;
     }
 }
