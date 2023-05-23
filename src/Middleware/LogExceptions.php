@@ -8,7 +8,6 @@ use Linio\Common\Laminas\Exception\Base\NonCriticalDomainException;
 use Linio\Component\Microlog\Log;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Laminas\Stratigility\Middleware\ErrorHandler;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
@@ -18,21 +17,15 @@ class LogExceptions implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        $errorMiddleware = new ErrorHandler(
-            function ($request) use ($handler) {
-                return $handler->handle($request);
-            },
-            null,
-            function ($error, $request, $response) {
-                if ($error instanceof NonCriticalDomainException) {
-                    Log::error($error, [], self::EXCEPTIONS_CHANNEL);
-                } else {
-                    Log::critical($error, [], self::EXCEPTIONS_CHANNEL);
-                }
-                return $response;
-            }
-        );
+        $error = $handler->handle($request);
+        $body = json_decode($error->getBody()->getContents(), false);
 
-        return $errorMiddleware->process($request, $handler);
+        if ($error instanceof NonCriticalDomainException) {
+            Log::error($body->errors, [], self::EXCEPTIONS_CHANNEL);
+        } else {
+            Log::critical($body->errors, [], self::EXCEPTIONS_CHANNEL);
+        }
+
+        return $error;
     }
 }
