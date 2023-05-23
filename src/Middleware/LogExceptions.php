@@ -17,19 +17,33 @@ class LogExceptions implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        $error_handle = $handler->handle($request);
-        $body = json_decode($$error_handle->getBody()->getContents(), false);
+        try {
+            $response = $handler->handle($request);
+            $body = json_decode($response->getBody()->getContents());
 
-        $error = ($body === null && json_last_error() !== JSON_ERROR_NONE)
-                 ? 'Error: Invalid response'
-                 : (empty($body->errors) || !isset($body->errors)) ? $body : $body->errors;
+            $error = $this->getErrors($body);
 
-        if ($error instanceof NonCriticalDomainException) {
-            Log::error($error, [], self::EXCEPTIONS_CHANNEL);
-        } else {
-            Log::critical($error, [], self::EXCEPTIONS_CHANNEL);
+            if ($response instanceof NonCriticalDomainException) {
+                Log::error($error, [], self::EXCEPTIONS_CHANNEL);
+            } else {
+                Log::critical($error, [], self::EXCEPTIONS_CHANNEL);
+            }
+
+            return $response;
+        } catch (\Exception $exception) {
+            Log::critical($exception->getMessage(), [], self::EXCEPTIONS_CHANNEL);
+            return new Response(500, [], 'Internal Server Error');
+        }
+    }
+
+    private function getErrors($body)
+    {
+        if ($body === null && json_last_error() !== JSON_ERROR_NONE){
+            $error = 'Error: Invalid response';
+        }else{
+            $error = (empty($body->errors) || !isset($body->errors)) ? $body : $body->errors;
         }
 
-        return $error_handle;
+        return $error;
     }
 }
