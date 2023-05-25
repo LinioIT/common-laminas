@@ -17,19 +17,37 @@ class LogExceptions implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        $error_handle = $handler->handle($request);
-        $body = json_decode($$error_handle->getBody()->getContents(), false);
+        $response = $handler->handle($request);
+        $body = json_decode($response->getBody()->getContents());
 
-        $error = ($body === null && json_last_error() !== JSON_ERROR_NONE)
-                 ? 'Error: Invalid response'
-                 : (empty($body->errors) || !isset($body->errors)) ? $body : $body->errors;
+        $errors = $this->getErrors($body);
 
-        if ($error instanceof NonCriticalDomainException) {
-            Log::error($error, [], self::EXCEPTIONS_CHANNEL);
-        } else {
-            Log::critical($error, [], self::EXCEPTIONS_CHANNEL);
+        foreach ($errors as $error) {
+            if(isset($error->message)){
+                $this->saveLog($error->message, (array) $error, $response);
+            }
         }
 
-        return $error_handle;
+        return $response;
+    }
+
+    private function getErrors($body): array
+    {
+        if ($body === null && json_last_error() !== JSON_ERROR_NONE){
+            $errors[] = ['message' => 'Error: Invalid response'];
+        }else{
+            $errors = (empty($body->errors) || !isset($body->errors)) ? [0 => (array) $body] : $body->errors;
+        }
+
+        return (array) $errors;
+    }
+
+    private function saveLog($message, $error, $handle)
+    {
+        if ($handle instanceof NonCriticalDomainException) {
+            Log::error($message, $error, self::EXCEPTIONS_CHANNEL);
+        } else {
+            Log::critical($message, $error, self::EXCEPTIONS_CHANNEL);
+        }
     }
 }
