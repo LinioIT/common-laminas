@@ -17,33 +17,37 @@ class LogExceptions implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        try {
-            $response = $handler->handle($request);
-            $body = json_decode($response->getBody()->getContents());
+        $response = $handler->handle($request);
+        $body = json_decode($response->getBody()->getContents());
 
-            $error = $this->getErrors($body);
+        $errors = $this->getErrors($body);
 
-            if ($response instanceof NonCriticalDomainException) {
-                Log::error($error, [], self::EXCEPTIONS_CHANNEL);
-            } else {
-                Log::critical($error, [], self::EXCEPTIONS_CHANNEL);
+        foreach ($errors as $error) {
+            if(isset($error->message)){
+                $this->saveLog($error->message, (array) $error, $response);
             }
-
-            return $response;
-        } catch (\Exception $exception) {
-            Log::critical($exception->getMessage(), [], self::EXCEPTIONS_CHANNEL);
-            return new Response(500, [], 'Internal Server Error');
         }
+
+        return $response;
     }
 
-    private function getErrors($body)
+    private function getErrors($body): array
     {
         if ($body === null && json_last_error() !== JSON_ERROR_NONE){
-            $error = 'Error: Invalid response';
+            $errors[] = ['message' => 'Error: Invalid response'];
         }else{
-            $error = (empty($body->errors) || !isset($body->errors)) ? $body : $body->errors;
+            $errors = (empty($body->errors) || !isset($body->errors)) ? [0 => (array) $body] : $body->errors;
         }
 
-        return $error;
+        return (array) $errors;
+    }
+
+    private function saveLog($message, $error, $handle)
+    {
+        if ($handle instanceof NonCriticalDomainException) {
+            Log::error($message, $error, self::EXCEPTIONS_CHANNEL);
+        } else {
+            Log::critical($message, $error, self::EXCEPTIONS_CHANNEL);
+        }
     }
 }
